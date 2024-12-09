@@ -3,7 +3,7 @@
 </p>
 
 <h6 align="center">
-    Remarkable to pdf Exporter    
+    Export all your reMarkable notes to your PC as PDF
 </h6>
 
 <h1></h1>
