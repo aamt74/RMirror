@@ -24,7 +24,7 @@ RMirror is a Python tool that allows you to export all files from your reMarkabl
 
 ## Showcase
 <p align="center">
-  <img src="showcase.gif"/>
+  <img src="images/showcase.gif"/>
 </p>
 
 ## Contributing
