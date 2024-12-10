@@ -17,16 +17,16 @@
 - [Usage](#usage)
 - [Contributing](#Contributing)
 
-### Description
+## Description
 
 RMirror is a Python tool that allows you to export all files from your reMarkable device to your PC in PDF format, maintaining the original folder structure.
 
-### Showcase
+## Showcase
 <p align="center">
   <img src="images/showcase.gif"/>
 </p>
 
-### Installation
+## Installation
 
 1. **Clone the repository**  
    Clone the repository using the following command:  
@@ -44,7 +44,7 @@ RMirror is a Python tool that allows you to export all files from your reMarkabl
     PASSWORD = "9Vlops9T2"
     ```
 
-### Usage
+## Usage
 1. **Connect your Remarkable to the computer**  
    - Plug your Remarkable tablet into your computer using a USB cable.  
    - Make sure the **Trash** on the Remarkable is empty.  
