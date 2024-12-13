@@ -51,8 +51,10 @@ class Entry:
             dir_name_list.pop(0)
 
         for x in dir_name_list:
-            full_dir_path = full_dir_path + "/" + x
-
+            if x != "None":
+                full_dir_path = full_dir_path + "/" + x
+            else:
+                break
 
         os.makedirs(full_dir_path, exist_ok=True)
    
