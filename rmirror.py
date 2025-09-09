@@ -1,8 +1,10 @@
-import paramiko
 import sys
-
-from settings import * 
-from entry.entry import Entry, EntryType
+from paramiko import SSHClient, AutoAddPolicy
+from scp import SCPClient
+from pathlib import Path
+from typing import Dict
+from settings import hostname, username, password
+from entry import Entry, EntryUtils
 
 
 def main():
@@ -13,72 +15,72 @@ def main():
     elif sys.argv[1] == "--help" or sys.argv[1] == "-h":
         print("Created by rdWei: https://www.github.com/rdwei\n\nUsage: rmirror.py <destination path>\n\nExample: python3 rmirror.py ~/Downloads")   
         exit(0)
-    
+
     destination_path = sys.argv[1]
 
+    # Open SSH connection
+    ssh = SSHClient()
+    try:
+        ssh.set_missing_host_key_policy(AutoAddPolicy())
+        ssh.connect(hostname, username=username, password=password)
+    except Exception as e:
+        print(f"Error while opening connection: {e}")
+        sys.exit(1)
 
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # Accetta automaticamente la chiave dell'host
-    client.connect(hostname, username=username, password=password)
-
-
-    _, stdout, _ = client.exec_command("ls .local/share/remarkable/xochitl/")
-
+    # Get directory listing
+    _, stdout, _ = ssh.exec_command("ls .local/share/remarkable/xochitl/*.metadata")
     file_list = stdout.read().decode("utf-8").splitlines()
 
-    filtered_files = [file for file in file_list if file.endswith('.pdf') or file.endswith('.metadata')]
+    # Create entries
+    print("getting metadata...")
+    entries_map: Dict[str, Entry] = {}
+    for filename in file_list:
+        id = Path(filename).stem
+        _, stdout, _ = ssh.exec_command("cat " + filename)
+        metadata = stdout.read().decode("utf-8")
+        entries_map[id] = Entry(id, metadata)
 
+    # Complete relative paths
+    for id, entry in entries_map.items():
+        completed_path = EntryUtils.CompletePath(entry, entries_map)
+        entries_map[id].relative_path = completed_path
 
-    # Append Entry
-    entry_list = []
+    # Create all directories locally
+    local_root = Path(destination_path)
+    for entry in entries_map.values():
+        if entry.is_dir():
+            local_root.joinpath(entry.relative_path).mkdir(parents=True, exist_ok=True)
 
+    # Prepare progress info
+    done = 0
+    todo = 0
+    for entry in entries_map.values():
+        if entry.is_file() and "trash" not in str(entry.relative_path):
+            todo += 1
 
-    for filename in filtered_files:
-        ID = filename.split(".")[0]
-        if (filename.split(".")[1] == "metadata"):
-            _, stdout, _ = client.exec_command("cat .local/share/remarkable/xochitl/"+filename)
-            content = stdout.read().decode("utf-8")
-            e = Entry(ID, content)
+    # Start mirroring (first fast scp, then slow http)
+    for entry in entries_map.values():
+        if entry.is_file() and "trash" not in str(entry.relative_path):
+            done += 1
+            progress = int(100 * done / todo)
+            path_dst = local_root.joinpath(entry.relative_path)
+            print(f"[{progress:3d}%]" + " downloading " + str(path_dst))
+            with SCPClient(ssh.get_transport()) as scp:
+                try:
+                    remote_path = f".local/share/remarkable/xochitl/{entry.ID}.pdf"
+                    local_path = path_dst
+                    scp.get(remote_path, local_path)
+                except Exception:
+                    path_src = EntryUtils.DownloadPdf(entry)
+                    path_src.rename(path_dst)
 
-            if "trash" not in e.itsMetadataContent:
-                entry_list.append(e)
-            
-    
-    # Initialize parent directory
-    for x in entry_list:
-        parentID = x.itsMetadataContent.split("parent")[1].split("\"")[2]
-        for y in entry_list:
-            if y.itsID == parentID:
-                x.itsParentVisibleName = y.itsVisibleName
-                
-
-    # End Connection
+    # End SSH connection
     try:
-        client.close()
+        ssh.close()
     except Exception as e:
-        print(f"Errore durante la chiusura: {e}")
+        print(f"Error while closing connection: {e}")
+        sys.exit(1)
 
-
-    # Divide Entry By Type
-    directory_entry_list = []
-    file_entry_list = []
-
-    for x in entry_list:
-        if x.itsType == EntryType.DIRECTORY:
-            directory_entry_list.append(x)
-        else:
-            file_entry_list.append(x)
-
-    
-    # Create File Tree
-    Entry.createTree(directory_entry_list, destination_path)
-    
-
-    for x in file_entry_list:
-        if (x.itsParentVisibleName == "trash"):
-            continue
-        x.downloadPdf(directory_entry_list, destination_path)
-    
 
 if __name__ == "__main__":
     main()
